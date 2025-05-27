@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>프리다이빙 정보 시스템</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="global-nav sticky top-0 z-50 p-4 shadow-md" style="background-color: var(--card-bg-color);">
+        <div class="container mx-auto flex flex-wrap justify-between items-center">
+            <div class="flex gap-2">
+                <button id="showPoolFinderViewBtn" class="nav-button active">
+                    <i class="fas fa-water"></i> 풀장 찾기
+                </button>
+                <button id="showLogbookViewBtn" class="nav-button">
+                    <i class="fas fa-book"></i> 기록장
+                </button>
+            </div>
+            <button id="themeToggleBtn" class="theme-toggle-button" title="테마 변경">
+                <i class="fas fa-sun"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <div id="poolFinderView">
+            <header class="text-center mb-2 sm:mb-4">
+                <h1 class="text-3xl sm:text-4xl font-bold header-title">프리다이빙 풀 전문 안내</h1>
+                <p class="header-subtitle mt-2 text-lg">서울, 경기 및 인근 지역의 프리다이빙 풀들을 만나보세요.</p>
+            </header>
+            <div class="controls-container flex flex-col md:flex-row md:flex-nowrap gap-4 items-center justify-between mb-8">
+                <input type="search" id="searchInput" placeholder="풀 이름 또는 지역 검색..." class="w-full md:flex-grow">
+                <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto md:flex-shrink-0">
+                    <select id="regionFilter" class="min-w-[120px] w-full sm:w-auto">
+                        <option value="all">모든 지역</option><option value="서울">서울</option>
+                        <option value="경기북부">경기 북부</option><option value="경기남부">경기 남부</option>
+                        <option value="인천">인천</option>
+                    </select>
+                    <select id="depthFilter" class="min-w-[120px] w-full sm:w-auto">
+                        <option value="all">모든 수심</option><option value="5">5m 이하</option>
+                        <option value="10">6-10m</option><option value="20">11-20m</option>
+                        <option value="21">20m 초과</option>
+                    </select>
+                </div>
+            </div>
+            <hr class="section-divider my-6">
+            <div id="pool-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8"></div>
+            <p id="noPoolResultsMessage" class="text-center text-xl py-10" style="display: none;">풀장 검색 결과가 없습니다.</p>
+        </div>
+
+        <div id="logbookView" style="display: none;">
+            <header class="text-center mb-8">
+                <div class="flex justify-center items-center gap-x-2 mb-1"> 
+                    <h1 class="text-3xl sm:text-4xl font-bold header-title" id="logbookMainTitle">나의 프리다이빙 기록장</h1>
+                    <button id="editNicknameBtn" class="nickname-button text-sm p-1.5 leading-none" title="닉네임 수정">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                </div>
+                <div id="nicknameEditArea" style="display:none;" class="flex justify-center items-center gap-2 mt-2">
+                    <input type="text" id="nicknameInput" placeholder="닉네임 입력 (최대 10자)" maxlength="10" class="py-1 px-2 rounded w-auto text-sm" style="background-color: var(--input-bg-color); color: var(--input-text-color); border: 1px solid var(--input-border-color);">
+                    <button id="saveNicknameBtn" class="nickname-button text-sm p-1.5 leading-none">저장</button>
+                    <button id="cancelNicknameBtn" class="nickname-button text-sm p-1.5 leading-none">취소</button>
+                </div>
+                <p class="header-subtitle mt-1 text-lg">소중한 다이빙 기록을 관리하세요.</p>
+            </header>
+
+            <div class="log-form-container mb-8">
+                <h2 class="text-2xl font-semibold header-subtitle mb-4" id="logFormTitle">새 기록 추가</h2>
+                <form id="freedivingLogForm" class="space-y-4">
+                    <input type="hidden" id="logEntryId">
+                    <div>
+                        <label for="logDate" class="form-label">날짜:</label>
+                        <input type="date" id="logDate" required>
+                    </div>
+                    <div>
+                        <label for="logLocation" class="form-label">장소:</label>
+                        <input type="text" id="logLocation" placeholder="예: K-26, 딥스테이션, 판포포구" required>
+                    </div>
+                    <div>
+                        <label for="logDiscipline" class="form-label">종목:</label>
+                        <select id="logDiscipline" required>
+                            <option value="">종목 선택...</option>
+                            <option value="STA">STA (무호흡 잠영)</option>
+                            <option value="DYN">DYN (수평 잠영 - 핀)</option>
+                            <option value="DNF">DNF (수평 잠영 - 노핀)</option>
+                            <option value="CWT">CWT (수직 잠영 - 핀)</option>
+                            <option value="CWTB">CWTB (수직 잠영 - 바이핀)</option>
+                            <option value="CNF">CNF (수직 잠영 - 노핀)</option>
+                            <option value="FIM">FIM (자유 하강)</option>
+                            <option value="VWT">VWT (가변 웨이트)</option>
+                            <option value="NLT">NLT (무제한급)</option>
+                            <option value="TRAINING">트레이닝/기타</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="logPerformance" class="form-label">기록:</label>
+                            <input type="number" step="any" id="logPerformance" placeholder="예: 30 (수심/거리), 180 (시간 초)" required>
+                        </div>
+                        <div>
+                            <label for="logUnit" class="form-label">단위:</label>
+                            <input type="text" id="logUnit" placeholder="예: m, sec, min:sec">
+                        </div>
+                    </div>
+                     <div>
+                        <label for="logTimeFormatted" class="form-label">시간 기록 (STA 등):</label>
+                        <input type="text" id="logTimeFormatted" placeholder="mm:ss 또는 hh:mm:ss (선택 사항)">
+                    </div>
+                    <div>
+                        <label for="logNotes" class="form-label">메모:</label>
+                        <textarea id="logNotes" rows="3" placeholder="오늘의 컨디션, 배운 점, 느낀 점 등을 자유롭게 기록하세요."></textarea>
+                    </div>
+                    <div class="flex gap-2">
+                        <button type="submit" id="saveLogBtn" class="action-button text-white font-bold py-2 px-4 rounded-lg w-full">
+                            <i class="fas fa-save"></i> 기록 저장
+                        </button>
+                        <button type="button" id="cancelEditLogBtn" class="action-button text-white font-bold py-2 px-4 rounded-lg w-full" style="display:none; background-color: var(--button-secondary-bg);">
+                            취소
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <hr class="section-divider my-6">
+            <h2 class="text-2xl font-semibold header-subtitle mb-4">기록 목록</h2>
+            <div id="logListContainer" class="space-y-4">
+            </div>
+            <p id="noLogsMessage" class="text-center text-xl py-10" style="display: none;">아직 기록된 로그가 없습니다. 첫 기록을 추가해보세요!</p>
+        </div>
+    </div>
+
+    <button id="backToTopBtn" class="back-to-top-button" title="맨 위로 가기">
+        <i class="fas fa-arrow-up"></i>
+    </button>
+
+    <div id="poolModal" class="modal"> 
+        <div class="modal-content">
+            <span class="modal-close-button" id="modalCloseBtn">&times;</span>
+            <img id="modalPoolImage" src="" alt="풀 이미지" class="w-full modal-image">
+            <h2 id="modalPoolName" class="text-2xl font-bold header-title mb-2"></h2>
+            <div class="text-sm mb-3 space-y-1" style="color: var(--text-color);">
+                <p><i class="fas fa-map-marker-alt info-icon"></i>위치: <span id="modalPoolLocation"></span></p>
+                <p><i class="fas fa-ruler-vertical info-icon"></i>최대 수심: <span id="modalPoolMaxDepth"></span></p>
+            </div>
+            <hr class="section-divider my-3">
+            <p id="modalPoolDescription" class="text-sm my-3" style="color: var(--text-color);"></p>
+            <hr class="section-divider my-3">
+            <div class="my-3">
+                <h4 class="text-md font-semibold mb-1" style="color: var(--header-subtitle-color);">운영 시간:</h4>
+                <p id="modalPoolOperatingHours" class="text-sm" style="color: var(--text-color);"></p>
+                <p class="disclaimer-text">참고: 각 풀의 최신 정보(운영 시간, 요금, 예약 방법 등)는 방문 전에 반드시 공식 채널을 통해 확인해 주시기 바랍니다.</p>
+            </div>
+            <a id="modalPoolReservationLink" href="#" target="_blank" rel="noopener noreferrer" class="action-button mt-4 block text-white font-bold py-3 px-4 rounded-lg shadow-md text-center">
+                <i class="fas fa-external-link-alt external-link-icon"></i>예약 및 상세 정보
+            </a>
+        </div>
+    </div>
+
+    <script src="script.js" defer></script>
+</body>
+</html>
