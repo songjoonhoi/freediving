@@ -8,6 +8,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="global-nav sticky top-0 z-50 p-4 shadow-md" style="background-color: var(--card-bg-color);">
@@ -17,7 +18,7 @@
                     <i class="fas fa-water"></i> 풀장 찾기
                 </button>
                 <button id="showLogbookViewBtn" class="nav-button">
-                    <i class="fas fa-book"></i> 기록장
+                    <i class="fas fa-book"></i> 기록
                 </button>
             </div>
             <button id="themeToggleBtn" class="theme-toggle-button" title="테마 변경">
@@ -55,7 +56,7 @@
         <div id="logbookView" style="display: none;">
             <header class="text-center mb-8">
                 <div class="flex justify-center items-center gap-x-2 mb-1"> 
-                    <h1 class="text-3xl sm:text-4xl font-bold header-title" id="logbookMainTitle">나의 프리다이빙 기록장</h1>
+                    <h1 class="text-3xl sm:text-4xl font-bold header-title" id="logbookMainTitle">나의 프리다이빙 기록</h1>
                     <button id="editNicknameBtn" class="nickname-button text-sm p-1.5 leading-none" title="닉네임 수정">
                         <i class="fas fa-edit"></i>
                     </button>
@@ -124,6 +125,27 @@
                     </div>
                 </form>
             </div>
+
+            <div id="logGraphSection" class="mb-8 p-4 rounded-lg" style="background-color: var(--card-bg-color); border: 1px solid var(--card-border-color);">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-2xl font-semibold header-subtitle">기록 변화 그래프</h2>
+                    <select id="graphDisciplineFilter" class="min-w-[150px] text-sm p-2" style="background-color: var(--input-bg-color); color: var(--input-text-color); border: 1px solid var(--input-border-color); border-radius: 0.375rem;">
+                        <option value="">그래프 종목 선택...</option>
+                        <option value="STA">STA (무호흡 잠영)</option>
+                        <option value="DYN">DYN (수평 잠영 - 핀)</option>
+                        <option value="DNF">DNF (수평 잠영 - 노핀)</option>
+                        <option value="CWT">CWT (수직 잠영 - 핀)</option>
+                        <option value="CWTB">CWTB (수직 잠영 - 바이핀)</option>
+                        <option value="CNF">CNF (수직 잠영 - 노핀)</option>
+                        <option value="FIM">FIM (자유 하강)</option>
+                    </select>
+                </div>
+                <div class="relative h-64 sm:h-80">
+                    <canvas id="logChart"></canvas>
+                </div>
+                <p id="noGraphDataMessage" class="text-center text-muted-color mt-4" style="display: none;">선택한 종목에 대한 기록이 충분하지 않거나 없습니다.</p>
+            </div>
+
             <hr class="section-divider my-6">
             <h2 class="text-2xl font-semibold header-subtitle mb-4">기록 목록</h2>
             <div id="logListContainer" class="space-y-4">

@@ -46,11 +46,16 @@ const cancelEditLogBtn = document.getElementById('cancelEditLogBtn');
 const logListContainer = document.getElementById('logListContainer');
 const noLogsMessage = document.getElementById('noLogsMessage');
 
+// 그래프 관련 DOM 요소
+const graphDisciplineFilter = document.getElementById('graphDisciplineFilter');
+const logChartCanvas = document.getElementById('logChart');
+const noGraphDataMessage = document.getElementById('noGraphDataMessage');
+let logChartInstance = null; // 차트 인스턴스 저장 변수
+
 // --- 데이터 정의 ---
 let poolsData = [ 
     { id: 1, name: "K-26 (가평)", location: "경기도 가평군", regionCategory: "경기북부", maxDepth: "26m", description: "아시아 최초, 최대 수심 26m의 다이빙 전용 풀. 다양한 수심 체험과 전문 강습 가능. VWT(Vertical Water Tunnel) 시설 보유.", image: "https://placehold.co/600x400/002244/99ccff?text=K-26+Freediving", altText: "K-26 프리다이빙 풀", operatingHours: "평일 10:00 - 21:00 / 주말 09:00 - 19:00", reservationLink: "https://k-26.com/" },
-    { id: 2, name: "딥스테이션 (용인)", location: "경기도 용인시", regionCategory: "경기남부", maxDepth: "36m", description: "최대 수심 36m, 세계에서 가장 깊은 실내 다이빙 풀 중 하나. 다양한 수중 구조물과 첨단 시설.", image: "https://placehold.co/600x400/003366/bbeeff?text=Deep+Station", altText: "딥스테이션 프리다이빙 풀", operatingHours: "매일 08:00 - 23:00", reservationLink: "https://deepstation.kr/" },
-    // { id: 3, name: "다이브오클락 (성남)", location: "경기도 성남시", regionCategory: "경기남부", maxDepth: "10m", description: "수심 10m의 프리다이빙 교육 및 트레이닝 전문 센터. 편리한 접근성과 쾌적한 환경.", image: "https://placehold.co/600x400/115577/aaddff?text=Dive+O'clock", altText: "다이브오클락 프리다이빙 풀", operatingHours: "평일 13:00 - 22:00 / 주말 10:00 - 19:00 (예약 필수)", reservationLink: "https://www.diveoclock.com/" }, // 다이브오클락 삭제
+    { id: 2, name: "딥스테이션 (용인)", location: "경기도 용인시", regionCategory: "경기남부", maxDepth: "36m", description: "최대 수심 36m, 국내에서 가장 깊은 실내 다이빙 풀 중 하나. 다양한 수중 구조물과 첨단 시설.", image: "https://placehold.co/600x400/003366/bbeeff?text=Deep+Station", altText: "딥스테이션 프리다이빙 풀", operatingHours: "매일 08:00 - 23:00", reservationLink: "https://deepstation.kr/" },
     { id: 4, name: "올림픽공원 다이빙풀 (서울 송파)", location: "서울시 송파구", regionCategory: "서울", maxDepth: "5m", description: "국제 규격의 다이빙 시설. 프리다이빙 강습 및 연습 대관 가능 (사전 확인 필수).", image: "https://placehold.co/600x400/0284c7/e0f2fe?text=Olympic+Park+Diving", altText: "올림픽공원 다이빙풀", operatingHours: "대관 및 강습 일정 확인 (문의: 02-424-0735)", reservationLink: "https://4240735.modoo.at/" },
     { id: 5, name: "수원월드컵경기장 다이빙풀 (수원)", location: "경기도 수원시 팔달구", regionCategory: "경기남부", maxDepth: "5m", description: "월드컵경기장 내 스포츠아일랜드에 위치. 프리다이빙 강습 및 연습 가능.", image: "https://placehold.co/600x400/075985/a5f3fc?text=Suwon+World+Cup+Diving", altText: "수원월드컵경기장 다이빙풀", operatingHours: "스포츠센터 운영 시간 확인 필요 (문의: 031-259-2154)", reservationLink: "https://www.worldcupdivingpool.com/" },
     { id: 6, name: "성남종합운동장 다이빙풀 (아쿠아라인)", location: "경기도 성남시 중원구", regionCategory: "경기남부", maxDepth: "5m", description: "성남종합운동장 내 위치한 다목적풀(아쿠아라인). 프리다이빙 강습 및 연습 활용.", image: "https://placehold.co/600x400/0891b2/67e8f9?text=Seongnam+Sports+Complex", altText: "성남종합운동장 다이빙풀", operatingHours: "운영 시간 확인 및 예약 필요 (문의: 031-759-3111)", reservationLink: "https://aqualine.modoo.at/" },
@@ -78,12 +83,16 @@ function applyTheme(theme) {
         themeToggleIcon.classList.add('fa-sun');
     }
     localStorage.setItem('theme', theme);
+    // 그래프가 이미 그려져 있다면 테마에 맞게 다시 그리기
+    if (logChartInstance && graphDisciplineFilter.value) {
+        updateLogChart(graphDisciplineFilter.value);
+    }
 }
 themeToggleBtn.addEventListener('click', () => {
     applyTheme(document.body.classList.contains('light-theme') ? 'dark' : 'light');
 });
 const savedTheme = localStorage.getItem('theme') || 'dark';
-applyTheme(savedTheme);
+// applyTheme(savedTheme); // 초기화 시점으로 이동
 
 // --- 닉네임 관리 ---
 function loadNickname() {
@@ -98,13 +107,17 @@ function saveNickname(newNickname) {
     }
     localStorage.setItem('freediverNickname', currentNickname);
     updateLogbookTitle();
+    // 닉네임 변경 시 그래프도 다시 그릴 수 있도록 처리 (만약 그래프에 닉네임이 표시된다면)
+    if (graphDisciplineFilter.value) {
+        updateLogChart(graphDisciplineFilter.value);
+    }
 }
 
 function updateLogbookTitle() {
     if (currentNickname) {
-        logbookMainTitle.textContent = `${currentNickname}님의 프리다이빙 로그북`;
+        logbookMainTitle.textContent = `${currentNickname}님의 프리다이빙 기록`;
     } else {
-        logbookMainTitle.textContent = '나의 프리다이빙 로그북';
+        logbookMainTitle.textContent = '나의 프리다이빙 기록';
     }
 }
 
@@ -118,7 +131,6 @@ editNicknameBtn.addEventListener('click', () => {
 saveNicknameBtn.addEventListener('click', () => {
     const newNickname = nicknameInput.value;
     if (newNickname.trim() === "") {
-        // Using console.log as a placeholder for alert/modal
         console.log("닉네임은 비워둘 수 없습니다."); 
         return;
     }
@@ -150,13 +162,28 @@ function switchView(viewToShow) {
         showLogbookViewBtn.classList.add('active');
         loadNickname(); 
         loadAndRenderLogs(); 
+        // 로그북 뷰로 전환 시, 선택된 종목이 있다면 그래프 업데이트
+        if (graphDisciplineFilter.value) {
+            updateLogChart(graphDisciplineFilter.value);
+        } else {
+            // 기본적으로 첫번째 유효한 종목으로 그래프를 그리거나, 안내 메시지 표시
+            const firstValidDiscipline = freedivingLogs.length > 0 ? freedivingLogs[0].discipline : "";
+            if (firstValidDiscipline && graphDisciplineFilter.querySelector(`option[value="${firstValidDiscipline}"]`)) {
+                 graphDisciplineFilter.value = firstValidDiscipline;
+                 updateLogChart(firstValidDiscipline);
+            } else {
+                noGraphDataMessage.style.display = 'block';
+                logChartCanvas.style.display = 'none'; // 캔버스도 숨김
+                if(logChartInstance) logChartInstance.destroy(); // 기존 차트 제거
+            }
+        }
     }
 }
 showPoolFinderViewBtn.addEventListener('click', () => switchView('poolFinder'));
 showLogbookViewBtn.addEventListener('click', () => switchView('logbook'));
 
 
-// --- 풀장 찾기 로직 ---
+// --- 풀장 찾기 로직 (기존과 동일) ---
 function getNumericDepth(depthString) { 
     if (typeof depthString !== 'string' || depthString.toLowerCase().includes('문의')) return 0;
     const match = depthString.match(/(\d+(\.\d+)?)/);
@@ -262,6 +289,10 @@ depthFilterSelect.addEventListener('change', applyPoolFiltersAndSearch);
 // --- 로그북 로직 ---
 function saveLogsToLocalStorage() {
     localStorage.setItem('freedivingLogs', JSON.stringify(freedivingLogs));
+    // 로그 저장 시 그래프 업데이트 (선택된 종목이 있다면)
+    if (graphDisciplineFilter.value) {
+        updateLogChart(graphDisciplineFilter.value);
+    }
 }
 
 function loadLogsFromLocalStorage() {
@@ -325,11 +356,16 @@ freedivingLogForm.addEventListener('submit', function(event) {
         date: logDateInput.value,
         location: logLocationInput.value,
         discipline: logDisciplineSelect.value,
-        performance: logPerformanceInput.value,
+        performance: parseFloat(logPerformanceInput.value), // 숫자로 저장
         unit: logUnitInput.value,
         timeFormatted: logTimeFormattedInput.value || '',
         notes: logNotesTextarea.value,
     };
+
+    if (!logData.date || !logData.location || !logData.discipline || isNaN(logData.performance)) {
+        console.log("필수 입력 항목을 모두 채워주세요 (날짜, 장소, 종목, 기록)."); // alert 대신 console 사용
+        return;
+    }
 
     if (logEntryIdInput.value) { 
         const index = freedivingLogs.findIndex(log => log.id === logEntryIdInput.value);
@@ -340,7 +376,7 @@ freedivingLogForm.addEventListener('submit', function(event) {
         freedivingLogs.push(logData);
     }
     
-    saveLogsToLocalStorage();
+    saveLogsToLocalStorage(); // 이 함수 내부에서 그래프 업데이트 호출
     renderFreedivingLogs();
     resetLogForm();
 });
@@ -370,20 +406,118 @@ window.editLogEntry = function(logId) {
 }
 
 window.deleteLogEntry = function(logId) { 
-    // Using console.log as a placeholder for confirm()
     console.log(`삭제 시도: ${logId}. 실제 앱에서는 확인창을 사용하세요.`);
-    // if (confirm('정말로 이 기록을 삭제하시겠습니까?')) { // This line is commented out to avoid issues in iframe
-        freedivingLogs = freedivingLogs.filter(log => log.id !== logId);
-        saveLogsToLocalStorage();
-        renderFreedivingLogs();
-        resetLogForm(); 
-    // }
+    freedivingLogs = freedivingLogs.filter(log => log.id !== logId);
+    saveLogsToLocalStorage(); // 이 함수 내부에서 그래프 업데이트 호출
+    renderFreedivingLogs();
+    resetLogForm(); 
 }
 
 function loadAndRenderLogs() {
     loadLogsFromLocalStorage();
     renderFreedivingLogs();
 }
+
+// --- 그래프 로직 ---
+function updateLogChart(discipline) {
+    if (logChartInstance) {
+        logChartInstance.destroy(); 
+    }
+
+    if (!discipline) {
+        noGraphDataMessage.style.display = 'block';
+        logChartCanvas.style.display = 'none';
+        return;
+    }
+
+    const disciplineLogs = freedivingLogs
+        .filter(log => log.discipline === discipline && !isNaN(parseFloat(log.performance)))
+        .sort((a, b) => new Date(a.date) - new Date(b.date)); 
+
+    if (disciplineLogs.length < 2) { 
+        noGraphDataMessage.style.display = 'block';
+        logChartCanvas.style.display = 'none';
+        return;
+    }
+
+    noGraphDataMessage.style.display = 'none';
+    logChartCanvas.style.display = 'block';
+
+    const labels = disciplineLogs.map(log => new Date(log.date).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }));
+    const data = disciplineLogs.map(log => parseFloat(log.performance));
+    
+    const currentTheme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
+    const gridColor = currentTheme === 'light' ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.2)';
+    const ticksColor = currentTheme === 'light' ? '#374151' : '#e0f2fe'; 
+    const pointBackgroundColor = currentTheme === 'light' ? '#2563eb' : '#60a5fa'; 
+    const borderColor = pointBackgroundColor;
+
+
+    logChartInstance = new Chart(logChartCanvas, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: `${discipline} 기록 (${disciplineLogs[0]?.unit || '단위 없음'})`, 
+                data: data,
+                borderColor: borderColor,
+                backgroundColor: borderColor, 
+                tension: 0.1,
+                fill: false,
+                pointBackgroundColor: pointBackgroundColor,
+                pointRadius: 4,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: false, 
+                    grid: { color: gridColor },
+                    ticks: { color: ticksColor, font: { family: "'Inter', sans-serif" } }
+                },
+                x: {
+                    grid: { color: gridColor },
+                    ticks: { color: ticksColor, font: { family: "'Inter', sans-serif" } }
+                }
+            },
+            plugins: {
+                legend: {
+                    labels: { 
+                        color: ticksColor,
+                        font: { family: "'Inter', sans-serif", size: 14 }
+                    }
+                },
+                tooltip: {
+                    titleFont: { family: "'Inter', sans-serif" },
+                    bodyFont: { family: "'Inter', sans-serif" },
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label = label.split(' (')[0]; // 단위 부분 제외하고 종목 이름만 가져오기
+                                label += ': ';
+                            }
+                            if (context.parsed.y !== null) {
+                                label += context.parsed.y + ` ${disciplineLogs[context.dataIndex]?.unit || ''}`;
+                            }
+                            if (disciplineLogs[context.dataIndex]?.timeFormatted) {
+                                label += ` (${disciplineLogs[context.dataIndex].timeFormatted})`;
+                            }
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+graphDisciplineFilter.addEventListener('change', (event) => {
+    updateLogChart(event.target.value);
+});
 
 
 // --- "맨 위로 가기" 버튼 (공통) ---
@@ -398,6 +532,7 @@ backToTopBtn.onclick = function() { window.scrollTo({top: 0, behavior: 'smooth'}
 
 // --- 초기화 ---
 document.addEventListener('DOMContentLoaded', () => {
+    applyTheme(savedTheme); 
     loadNickname(); 
     switchView('poolFinder'); 
     applyPoolFiltersAndSearch(); 
