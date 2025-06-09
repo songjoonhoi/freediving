@@ -4,8 +4,6 @@ const backToTopBtn = document.getElementById('backToTopBtn');
 const searchInput = document.getElementById('searchInput');
 const regionFilterSelect = document.getElementById('regionFilter');
 const depthFilterSelect = document.getElementById('depthFilter');
-const themeToggleBtn = document.getElementById('themeToggleBtn'); 
-const themeToggleIcon = themeToggleBtn.querySelector('i');
 const noPoolResultsMessage = document.getElementById('noPoolResultsMessage');
 
 const modal = document.getElementById('poolModal');
@@ -22,6 +20,22 @@ const showPoolFinderViewBtn = document.getElementById('showPoolFinderViewBtn');
 const showLogbookViewBtn = document.getElementById('showLogbookViewBtn');
 const poolFinderView = document.getElementById('poolFinderView');
 const logbookView = document.getElementById('logbookView');
+
+// --- 사용자 데이터 헬퍼 (추가) ---
+const authControls = document.getElementById('auth-controls');
+const getUsers = () => JSON.parse(localStorage.getItem('users')) || [];
+const saveUsers = (users) => localStorage.setItem('users', JSON.stringify(users));
+const getCurrentUserEmail = () => sessionStorage.getItem('currentUser');
+const getCurrentUser = () => {
+    const email = getCurrentUserEmail();
+    if (!email) return null;
+    const users = getUsers();
+    return users.find(u => u.email === email);
+};
+const logout = () => {
+    sessionStorage.removeItem('currentUser');
+    window.location.reload();
+};
 
 // 닉네임 관련 DOM 요소
 const logbookMainTitle = document.getElementById('logbookMainTitle');
@@ -73,14 +87,22 @@ let currentNickname = '';
 
 // --- 테마 관리 ---
 function applyTheme(theme) {
+    const themeToggleBtn = document.getElementById('themeToggleBtn');
+    if (!themeToggleBtn) return;
+    const themeToggleIcon = themeToggleBtn.querySelector('i');
+
     if (theme === 'light') {
         document.body.classList.add('light-theme');
-        themeToggleIcon.classList.remove('fa-sun'); 
-        themeToggleIcon.classList.add('fa-moon');
+        if (themeToggleIcon) {
+            themeToggleIcon.classList.remove('fa-sun'); 
+            themeToggleIcon.classList.add('fa-moon');
+        }
     } else {
         document.body.classList.remove('light-theme');
-        themeToggleIcon.classList.remove('fa-moon'); 
-        themeToggleIcon.classList.add('fa-sun');
+        if (themeToggleIcon) {
+            themeToggleIcon.classList.remove('fa-moon'); 
+            themeToggleIcon.classList.add('fa-sun');
+        }
     }
     localStorage.setItem('theme', theme);
     // 그래프가 이미 그려져 있다면 테마에 맞게 다시 그리기
@@ -88,28 +110,65 @@ function applyTheme(theme) {
         updateLogChart(graphDisciplineFilter.value);
     }
 }
-themeToggleBtn.addEventListener('click', () => {
-    applyTheme(document.body.classList.contains('light-theme') ? 'dark' : 'light');
-});
+
 const savedTheme = localStorage.getItem('theme') || 'dark';
-// applyTheme(savedTheme); // 초기화 시점으로 이동
+
+// --- UI 렌더링 (추가) ---
+function renderAuthControls() {
+    const currentUser = getCurrentUser();
+    const themeToggleIconClass = document.body.classList.contains('light-theme') ? 'fa-moon' : 'fa-sun';
+    const themeToggleBtnHtml = `
+        <button id="themeToggleBtn" class="theme-toggle-button" title="테마 변경">
+            <i class="fas ${themeToggleIconClass}"></i>
+        </button>
+    `;
+
+    if (currentUser) {
+        authControls.innerHTML = `
+            <span class="font-semibold" style="color: var(--text-color);">환영합니다, ${currentUser.nickname}님!</span>
+            <button id="logoutBtn" class="nav-button">
+                <i class="fas fa-sign-out-alt"></i><span class="hidden sm:inline"> 로그아웃</span>
+            </button>
+            ${themeToggleBtnHtml}
+        `;
+        document.getElementById('logoutBtn').addEventListener('click', logout);
+    } else {
+        authControls.innerHTML = `
+            <a href="login.html" class="nav-button">
+                <i class="fas fa-sign-in-alt"></i><span class="hidden sm:inline"> 로그인 / 회원가입</span>
+            </a>
+            ${themeToggleBtnHtml}
+        `;
+    }
+    
+    document.getElementById('themeToggleBtn').addEventListener('click', () => {
+        applyTheme(document.body.classList.contains('light-theme') ? 'dark' : 'light');
+    });
+}
 
 // --- 닉네임 관리 ---
 function loadNickname() {
-    currentNickname = localStorage.getItem('freediverNickname') || '';
-    updateLogbookTitle();
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+        currentNickname = currentUser.nickname;
+        updateLogbookTitle();
+    }
 }
 
 function saveNickname(newNickname) {
-    currentNickname = newNickname.trim();
-    if (currentNickname.length > 10) { 
-        currentNickname = currentNickname.substring(0, 10);
-    }
-    localStorage.setItem('freediverNickname', currentNickname);
-    updateLogbookTitle();
-    // 닉네임 변경 시 그래프도 다시 그릴 수 있도록 처리 (만약 그래프에 닉네임이 표시된다면)
-    if (graphDisciplineFilter.value) {
-        updateLogChart(graphDisciplineFilter.value);
+    let currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    const trimmedNickname = newNickname.trim();
+    currentNickname = trimmedNickname.length > 10 ? trimmedNickname.substring(0, 10) : trimmedNickname;
+    
+    let users = getUsers();
+    const userIndex = users.findIndex(u => u.email === currentUser.email);
+    if (userIndex !== -1) {
+        users[userIndex].nickname = currentNickname;
+        saveUsers(users);
+        updateLogbookTitle();
+        renderAuthControls(); // 네비게이션 바의 닉네임도 업데이트
     }
 }
 
@@ -158,24 +217,31 @@ function switchView(viewToShow) {
         poolFinderView.style.display = 'block';
         showPoolFinderViewBtn.classList.add('active');
     } else if (viewToShow === 'logbook') {
-        logbookView.style.display = 'block';
-        showLogbookViewBtn.classList.add('active');
-        loadNickname(); 
-        loadAndRenderLogs(); 
-        // 로그북 뷰로 전환 시, 선택된 종목이 있다면 그래프 업데이트
-        if (graphDisciplineFilter.value) {
-            updateLogChart(graphDisciplineFilter.value);
-        } else {
-            // 기본적으로 첫번째 유효한 종목으로 그래프를 그리거나, 안내 메시지 표시
-            const firstValidDiscipline = freedivingLogs.length > 0 ? freedivingLogs[0].discipline : "";
-            if (firstValidDiscipline && graphDisciplineFilter.querySelector(`option[value="${firstValidDiscipline}"]`)) {
-                 graphDisciplineFilter.value = firstValidDiscipline;
-                 updateLogChart(firstValidDiscipline);
+        const currentUser = getCurrentUser();
+        if (currentUser) {
+            logbookView.style.display = 'block';
+            showLogbookViewBtn.classList.add('active');
+            loadNickname(); 
+            loadAndRenderLogs();
+            // 로그북 뷰로 전환 시, 선택된 종목이 있다면 그래프 업데이트
+            if (graphDisciplineFilter.value) {
+                updateLogChart(graphDisciplineFilter.value);
             } else {
-                noGraphDataMessage.style.display = 'block';
-                logChartCanvas.style.display = 'none'; // 캔버스도 숨김
-                if(logChartInstance) logChartInstance.destroy(); // 기존 차트 제거
+                // 기본적으로 첫번째 유효한 종목으로 그래프를 그리거나, 안내 메시지 표시
+                const firstValidDiscipline = freedivingLogs.length > 0 ? freedivingLogs[0].discipline : "";
+                if (firstValidDiscipline && graphDisciplineFilter.querySelector(`option[value="${firstValidDiscipline}"]`)) {
+                     graphDisciplineFilter.value = firstValidDiscipline;
+                     updateLogChart(firstValidDiscipline);
+                } else {
+                    noGraphDataMessage.style.display = 'block';
+                    logChartCanvas.style.display = 'none'; // 캔버스도 숨김
+                    if(logChartInstance) logChartInstance.destroy(); // 기존 차트 제거
+                }
             }
+        } else {
+            poolFinderView.style.display = 'block';
+            showPoolFinderViewBtn.classList.add('active');
+            alert('로그인이 필요한 기능입니다.');
         }
     }
 }
@@ -263,44 +329,79 @@ function renderPools(poolsToRender) {
     });
 }
 function openPoolModal(pool) { 
-    modalPoolImage.src = pool.image; 
+    modalPoolImage.src = pool.image;
     modalPoolImage.alt = pool.altText;
-    modalPoolName.textContent = pool.name; 
+    modalPoolName.textContent = pool.name;
     modalPoolLocation.textContent = pool.location;
-    modalPoolMaxDepth.textContent = pool.maxDepth; 
+    modalPoolMaxDepth.textContent = pool.maxDepth;
     modalPoolDescription.textContent = pool.description;
-    modalPoolOperatingHours.textContent = pool.operatingHours; 
+    modalPoolOperatingHours.textContent = pool.operatingHours;
     modalPoolReservationLink.href = pool.reservationLink;
-    modal.classList.add('active'); 
-    document.body.style.overflow = 'hidden';
+    openModal(modal);
 }
 function closePoolModal() { 
-    modal.classList.remove('active'); 
-    document.body.style.overflow = '';
+    closeModal(modal);
 }
-modalCloseBtn.addEventListener('click', closePoolModal);
-modal.addEventListener('click', (event) => { if (event.target === modal) closePoolModal(); });
-document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && modal.classList.contains('active')) closePoolModal(); });
+
+// --- 범용 모달 관리 ---
+function openModal(modalElement) {
+    if (modalElement) {
+        modalElement.classList.add('active');
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+function closeModal(modalElement) {
+    if (modalElement) {
+        modalElement.classList.remove('active');
+        if (!document.querySelector('.modal.active')) {
+            document.body.style.overflow = '';
+        }
+    }
+}
+
+// 풀장 모달 이벤트 리스너
+modalCloseBtn.addEventListener('click', () => closeModal(modal));
+
+window.addEventListener('click', (event) => {
+    if (event.target === modal) {
+        closeModal(modal);
+    }
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && modal.classList.contains('active')) {
+        closeModal(modal);
+    }
+});
+
+// --- 풀장 필터 및 검색 이벤트 리스너 ---
 searchInput.addEventListener('input', applyPoolFiltersAndSearch);
 regionFilterSelect.addEventListener('change', applyPoolFiltersAndSearch);
 depthFilterSelect.addEventListener('change', applyPoolFiltersAndSearch);
 
 
 // --- 로그북 로직 ---
-function saveLogsToLocalStorage() {
-    localStorage.setItem('freedivingLogs', JSON.stringify(freedivingLogs));
-    // 로그 저장 시 그래프 업데이트 (선택된 종목이 있다면)
-    if (graphDisciplineFilter.value) {
-        updateLogChart(graphDisciplineFilter.value);
+function saveUserLogs() {
+    const currentUser = getCurrentUser();
+    if (!currentUser) return;
+
+    let users = getUsers();
+    const userIndex = users.findIndex(u => u.email === currentUser.email);
+    if (userIndex !== -1) {
+        users[userIndex].logs = freedivingLogs;
+        saveUsers(users);
     }
 }
 
-function loadLogsFromLocalStorage() {
-    const storedLogs = localStorage.getItem('freedivingLogs');
-    if (storedLogs) {
-        freedivingLogs = JSON.parse(storedLogs);
+function loadAndRenderLogs() {
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+        freedivingLogs = currentUser.logs || [];
+        renderFreedivingLogs();
     } else {
-        freedivingLogs = [];
+        logListContainer.innerHTML = '<p class="text-center text-xl py-10">로그인 후 기록을 확인하고 추가할 수 있습니다.</p>';
+        noLogsMessage.style.display = 'none';
     }
 }
 
@@ -313,11 +414,12 @@ function renderFreedivingLogs() {
     noLogsMessage.style.display = 'none';
 
     const sortedLogs = [...freedivingLogs].sort((a,b) => new Date(b.date) - new Date(a.date));
+    const currentUser = getCurrentUser();
+    const nicknamePrefix = currentUser ? `${currentUser.nickname}님 ` : '';
 
     sortedLogs.forEach(log => {
         const logCard = document.createElement('div');
         logCard.className = 'log-card rounded-lg shadow-md p-4'; 
-        const nicknamePrefix = currentNickname ? `${currentNickname}님 ` : '';
         logCard.innerHTML = `
             <div class="log-card-content">
                 <div class="flex justify-between items-start mb-2">
@@ -349,36 +451,43 @@ function resetLogForm() {
     logDateInput.valueAsDate = new Date(); 
 }
 
-freedivingLogForm.addEventListener('submit', function(event) {
+freedivingLogForm.addEventListener('submit', (event) => {
     event.preventDefault();
-    const logData = {
-        id: logEntryIdInput.value || 'log_' + Date.now(), 
+    if (!getCurrentUser()) {
+        alert("로그인이 필요합니다.");
+        return;
+    }
+    const newLog = {
+        id: logEntryIdInput.value || `log_${new Date().getTime()}`,
         date: logDateInput.value,
         location: logLocationInput.value,
         discipline: logDisciplineSelect.value,
-        performance: parseFloat(logPerformanceInput.value), // 숫자로 저장
+        performance: parseFloat(logPerformanceInput.value),
         unit: logUnitInput.value,
         timeFormatted: logTimeFormattedInput.value || '',
         notes: logNotesTextarea.value,
     };
 
-    if (!logData.date || !logData.location || !logData.discipline || isNaN(logData.performance)) {
-        console.log("필수 입력 항목을 모두 채워주세요 (날짜, 장소, 종목, 기록)."); // alert 대신 console 사용
+    if (!newLog.date || !newLog.location || !newLog.discipline || isNaN(newLog.performance)) {
+        console.log("필수 입력 항목을 모두 채워주세요 (날짜, 장소, 종목, 기록).");
         return;
     }
 
     if (logEntryIdInput.value) { 
         const index = freedivingLogs.findIndex(log => log.id === logEntryIdInput.value);
         if (index > -1) {
-            freedivingLogs[index] = logData;
+            freedivingLogs[index] = newLog;
         }
     } else { 
-        freedivingLogs.push(logData);
+        freedivingLogs.push(newLog);
     }
     
-    saveLogsToLocalStorage(); // 이 함수 내부에서 그래프 업데이트 호출
+    freedivingLogs.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    saveUserLogs();
     renderFreedivingLogs();
     resetLogForm();
+    updateLogChart(newLog.discipline);
 });
 
 cancelEditLogBtn.addEventListener('click', resetLogForm);
@@ -405,17 +514,15 @@ window.editLogEntry = function(logId) {
     }
 }
 
-window.deleteLogEntry = function(logId) { 
-    console.log(`삭제 시도: ${logId}. 실제 앱에서는 확인창을 사용하세요.`);
-    freedivingLogs = freedivingLogs.filter(log => log.id !== logId);
-    saveLogsToLocalStorage(); // 이 함수 내부에서 그래프 업데이트 호출
-    renderFreedivingLogs();
-    resetLogForm(); 
-}
-
-function loadAndRenderLogs() {
-    loadLogsFromLocalStorage();
-    renderFreedivingLogs();
+window.deleteLogEntry = function(logId) {
+    if (confirm("정말로 이 기록을 삭제하시겠습니까?")) {
+        freedivingLogs = freedivingLogs.filter(log => log.id !== logId);
+        saveUserLogs();
+        renderFreedivingLogs();
+        if (graphDisciplineFilter.value) {
+            updateLogChart(graphDisciplineFilter.value);
+        }
+    }
 }
 
 // --- 그래프 로직 ---
@@ -532,10 +639,13 @@ backToTopBtn.onclick = function() { window.scrollTo({top: 0, behavior: 'smooth'}
 
 // --- 초기화 ---
 document.addEventListener('DOMContentLoaded', () => {
-    applyTheme(savedTheme); 
-    loadNickname(); 
+    applyTheme(savedTheme);
+    renderAuthControls();
+    
+    loadAndRenderLogs();
+    applyPoolFiltersAndSearch();
+    loadNickname();
+
     switchView('poolFinder'); 
-    applyPoolFiltersAndSearch(); 
-    logDateInput.valueAsDate = new Date(); 
 });
 
